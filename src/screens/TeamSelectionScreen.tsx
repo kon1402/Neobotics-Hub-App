@@ -15,6 +15,7 @@ import {
   Chip,
   Surface,
   IconButton,
+  Switch,
 } from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
@@ -35,6 +36,9 @@ const TeamSelectionScreen: React.FC = () => {
   const navigation = useNavigation<TeamSelectionNavigationProp>();
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const [customTeam, setCustomTeam] = useState('');
+  const [customIPMode, setCustomIPMode] = useState(false);
+  const [customIP, setCustomIP] = useState('');
+  const [customName, setCustomName] = useState('');
 
   // Generate quick select options (popular team numbers)
   const quickSelectTeams = [1, 2, 3, 4, 5, 10, 15, 20, 25, 30];
@@ -47,9 +51,16 @@ const TeamSelectionScreen: React.FC = () => {
     return team >= 1 && team <= 99;
   };
 
+  const validateIPAddress = (ip: string): boolean => {
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ipRegex.test(ip);
+  };
+
   const handleQuickSelect = (teamNumber: number) => {
-    setSelectedTeam(teamNumber);
-    setCustomTeam('');
+    if (!customIPMode) {
+      setSelectedTeam(teamNumber);
+      setCustomTeam('');
+    }
   };
 
   const handleCustomTeamChange = (text: string) => {
@@ -62,34 +73,90 @@ const TeamSelectionScreen: React.FC = () => {
     }
   };
 
-  const handleConnect = () => {
-    if (!selectedTeam || !validateTeamNumber(selectedTeam)) {
-      Toast.show({
-        type: 'error',
-        text1: 'Invalid Team Number',
-        text2: 'Please select a team number between 1 and 99',
-      });
-      return;
-    }
+  const handleCustomIPModeToggle = () => {
+    setCustomIPMode(!customIPMode);
+    // Reset all selections when switching modes
+    setSelectedTeam(null);
+    setCustomTeam('');
+    setCustomIP('');
+    setCustomName('');
+  };
 
-    const ipAddress = generateIPAddress(selectedTeam);
-    
-    Alert.alert(
-      'Connect to Car',
-      `Team: ${selectedTeam}\\nIP: ${ipAddress}\\n\\nProceed with connection?`,
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Connect',
-          onPress: () => {
-            navigation.navigate('CarControl', {
-              teamNumber: selectedTeam,
-              ipAddress,
-            });
+  const handleCustomIPChange = (text: string) => {
+    setCustomIP(text);
+  };
+
+  const handleCustomNameChange = (text: string) => {
+    setCustomName(text);
+  };
+
+  const handleConnect = () => {
+    if (customIPMode) {
+      // Custom IP mode validation
+      if (!customIP || !validateIPAddress(customIP)) {
+        Toast.show({
+          type: 'error',
+          text1: 'Invalid IP Address',
+          text2: 'Please enter a valid IP address (e.g., 192.168.1.100)',
+        });
+        return;
+      }
+      if (!customName.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Missing Car Name',
+          text2: 'Please enter a name for your custom car',
+        });
+        return;
+      }
+
+      Alert.alert(
+        'Connect to Custom Car',
+        `Car: ${customName}\\nIP: ${customIP}\\n\\nProceed with connection?`,
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Connect',
+            onPress: () => {
+              navigation.navigate('CarControl', {
+                teamNumber: 0, // Use 0 for custom cars
+                ipAddress: customIP,
+                customCarName: customName,
+              });
+            },
           },
-        },
-      ],
-    );
+        ],
+      );
+    } else {
+      // Standard team mode validation
+      if (!selectedTeam || !validateTeamNumber(selectedTeam)) {
+        Toast.show({
+          type: 'error',
+          text1: 'Invalid Team Number',
+          text2: 'Please select a team number between 1 and 99',
+        });
+        return;
+      }
+
+      const ipAddress = generateIPAddress(selectedTeam);
+      
+      Alert.alert(
+        'Connect to NeoRacer',
+        `Team: ${selectedTeam}\\nIP: ${ipAddress}\\n\\nProceed with connection?`,
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {
+            text: 'Connect',
+            onPress: () => {
+              navigation.navigate('CarControl', {
+                teamNumber: selectedTeam,
+                ipAddress,
+              });
+            },
+          },
+        ],
+      );
+    }
   };
 
   const renderQuickSelectItem = ({item}: {item: number}) => (
@@ -101,7 +168,7 @@ const TeamSelectionScreen: React.FC = () => {
         selectedTeam === item && styles.selectedChip,
       ]}
       textStyle={selectedTeam === item && styles.selectedChipText}>
-      Team {item}
+      {item}
     </Chip>
   );
 
@@ -128,7 +195,74 @@ const TeamSelectionScreen: React.FC = () => {
           </Text>
         </Surface>
 
-        {/* Quick Select */}
+        {/* Mode Toggle */}
+        <Card style={styles.modeToggleCard}>
+          <Card.Content>
+            <View style={styles.modeToggleRow}>
+              <View style={styles.modeToggleContent}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  {customIPMode ? 'Custom Car Mode' : 'NeoRacer Team Mode'}
+                </Text>
+                <Text variant="bodySmall" style={styles.sectionDescription}>
+                  {customIPMode 
+                    ? 'Connect to any car with custom IP address' 
+                    : 'Connect to official NeoRacer teams (1-99)'}
+                </Text>
+                <Text variant="bodySmall" style={styles.toggleHint}>
+                  💡 Click to swap to a custom IP
+                </Text>
+              </View>
+              <Switch
+                value={customIPMode}
+                onValueChange={handleCustomIPModeToggle}
+                color={theme.colors.winningRed}
+              />
+            </View>
+          </Card.Content>
+        </Card>
+
+        {/* Custom IP Mode */}
+        {customIPMode ? (
+          <Card style={styles.customIPCard}>
+            <Card.Content>
+              <Text variant="titleMedium" style={styles.sectionTitle}>
+                Custom Car Setup
+              </Text>
+              <Text variant="bodySmall" style={styles.sectionDescription}>
+                Enter your car's details for maximum customizability
+              </Text>
+              
+              <TextInput
+                label="Car Name"
+                value={customName}
+                onChangeText={handleCustomNameChange}
+                style={styles.customInput}
+                left={<TextInput.Icon icon="car" />}
+                placeholder="e.g., My Racing Car, Custom Bot"
+                error={customName.trim() === ''}
+              />
+              
+              <TextInput
+                label="IP Address"
+                value={customIP}
+                onChangeText={handleCustomIPChange}
+                style={styles.customInput}
+                left={<TextInput.Icon icon="ip" />}
+                placeholder="e.g., 192.168.1.100"
+                keyboardType="numeric"
+                error={customIP !== '' && !validateIPAddress(customIP)}
+              />
+              
+              {customIP !== '' && !validateIPAddress(customIP) && (
+                <Text variant="bodySmall" style={styles.errorText}>
+                  Please enter a valid IP address (e.g., 192.168.1.100)
+                </Text>
+              )}
+            </Card.Content>
+          </Card>
+        ) : (
+          <>
+            {/* Quick Select */}
         <Card style={styles.quickSelectCard}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -174,31 +308,56 @@ const TeamSelectionScreen: React.FC = () => {
             )}
           </Card.Content>
         </Card>
+          </>
+        )}
 
         {/* Connection Info */}
-        {selectedTeam && (
+        {(customIPMode ? (customIP && customName.trim() && validateIPAddress(customIP)) : selectedTeam) && (
           <Card style={styles.connectionInfoCard}>
             <Card.Content>
               <Text variant="titleMedium" style={styles.sectionTitle}>
                 Connection Details
               </Text>
               <View style={styles.connectionDetails}>
-                <View style={styles.detailRow}>
-                  <Text variant="bodyMedium" style={styles.detailLabel}>
-                    Team:
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.detailValue}>
-                    {selectedTeam}
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text variant="bodyMedium" style={styles.detailLabel}>
-                    IP Address:
-                  </Text>
-                  <Text variant="bodyMedium" style={styles.detailValue}>
-                    {generateIPAddress(selectedTeam)}
-                  </Text>
-                </View>
+                {customIPMode ? (
+                  <>
+                    <View style={styles.detailRow}>
+                      <Text variant="bodyMedium" style={styles.detailLabel}>
+                        Car Name:
+                      </Text>
+                      <Text variant="bodyMedium" style={styles.detailValue}>
+                        {customName}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text variant="bodyMedium" style={styles.detailLabel}>
+                        IP Address:
+                      </Text>
+                      <Text variant="bodyMedium" style={styles.detailValue}>
+                        {customIP}
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.detailRow}>
+                      <Text variant="bodyMedium" style={styles.detailLabel}>
+                        Team:
+                      </Text>
+                      <Text variant="bodyMedium" style={styles.detailValue}>
+                        {selectedTeam}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text variant="bodyMedium" style={styles.detailLabel}>
+                        IP Address:
+                      </Text>
+                      <Text variant="bodyMedium" style={styles.detailValue}>
+                        {selectedTeam ? generateIPAddress(selectedTeam) : ''}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             </Card.Content>
           </Card>
@@ -208,14 +367,16 @@ const TeamSelectionScreen: React.FC = () => {
         <Button
           mode="contained"
           onPress={handleConnect}
-          disabled={!selectedTeam}
+          disabled={customIPMode ? !(customIP && customName.trim() && validateIPAddress(customIP)) : !selectedTeam}
           style={[
             styles.connectButton,
-            !selectedTeam && styles.disabledButton,
+            (customIPMode ? !(customIP && customName.trim() && validateIPAddress(customIP)) : !selectedTeam) && styles.disabledButton,
           ]}
           contentStyle={styles.buttonContent}
           icon="car-connected">
-          Connect to Team {selectedTeam || '?'} Car
+          {customIPMode 
+            ? `Connect to ${customName || 'Custom Car'}` 
+            : `Connect to Team ${selectedTeam || '?'} Car`}
         </Button>
 
         {/* Info */}
@@ -227,8 +388,9 @@ const TeamSelectionScreen: React.FC = () => {
           />
           <View style={styles.infoContent}>
             <Text variant="bodySmall" style={styles.infoText}>
-              Each team car has a static IP address in the format 192.168.1.1XX
-              where XX is the team number + 100.
+              {customIPMode 
+                ? 'Custom mode allows you to connect to any car with its IP address. Perfect for custom builds and private networks.'
+                : 'Each NeoRacer team car has a static IP address in the format 192.168.1.1XX where XX is the team number + 100.'}
             </Text>
           </View>
         </Surface>
@@ -272,6 +434,26 @@ const styles = StyleSheet.create({
     color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
   },
+  modeToggleCard: {
+    marginBottom: theme.spacing.lg,
+    elevation: 2,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modeToggleContent: {
+    flex: 1,
+    marginRight: theme.spacing.md,
+  },
+  customIPCard: {
+    marginBottom: theme.spacing.lg,
+    elevation: 2,
+  },
+  customInput: {
+    marginBottom: theme.spacing.md,
+  },
   quickSelectCard: {
     marginBottom: theme.spacing.lg,
     elevation: 2,
@@ -290,8 +472,13 @@ const styles = StyleSheet.create({
     color: theme.colors.onSurface,
   },
   sectionDescription: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
     color: theme.colors.onSurfaceVariant,
+  },
+  toggleHint: {
+    marginBottom: theme.spacing.lg,
+    color: theme.colors.primary,
+    fontStyle: 'italic',
   },
   quickSelectGrid: {
     justifyContent: 'space-between',

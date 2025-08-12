@@ -13,7 +13,7 @@ import CarControlScreen from './src/screens/CarControlScreen';
 export type RootStackParamList = {
   Home: undefined;
   TeamSelection: undefined;
-  CarControl: {teamNumber: number; ipAddress: string};
+  CarControl: {teamNumber: number; ipAddress: string; customCarName?: string};
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -39,7 +39,7 @@ function App(): JSX.Element {
             <Stack.Screen
               name="Home"
               component={HomeScreen}
-              options={{title: 'Neobotics Car Control'}}
+              options={{headerShown: false}}
             />
             <Stack.Screen
               name="TeamSelection"
@@ -50,7 +50,9 @@ function App(): JSX.Element {
               name="CarControl"
               component={CarControlScreen}
               options={({route}) => ({
-                title: `Team ${route.params.teamNumber} Control`,
+                title: route.params.customCarName 
+                  ? `${route.params.customCarName} Control`
+                  : `Team ${route.params.teamNumber} Control`,
               })}
             />
           </Stack.Navigator>
